@@ -1,0 +1,177 @@
+import pdfplumber
+import os
+import json
+from bs4 import BeautifulSoup
+from ebooklib import epub
+import ebooklib
+from epub2txt import epub2txt
+import sys,re,zipfile,os
+from html.parser import HTMLParser
+
+file_dir = r'D:\hntu deep learning program\NLPgeneration\searched-pdf'
+pdf_file_list = []
+pdf_file_name_list = []
+pdf_num = 0
+#Go through all the pdf documents
+for files in os.walk(file_dir):
+
+    for file in files[2]:
+        if os.path.splitext(file)[1] == '.pdf' or os.path.splitext(file)[1] == '.PDF':
+            pdf_file_list.append(file_dir + '\\' + file)
+            pdf_file_name_list.append(os.path.splitext(file)[0])
+            pdf_num += 1
+
+#print(pdf_file_list)
+all_doc = []
+
+for pdf_file_path in pdf_file_list:
+
+    pdf = pdfplumber.open(pdf_file_path)
+    pages = pdf.pages
+    #print(pages)
+
+    text_all = []
+    for page in pages:
+        text = page.extract_text()
+        text_all.append(text)
+    text_all = '\n'.join(text_all)
+    pdf.close()
+    all_doc.append(text_all)
+    #print(text_all)
+
+    #with open("pdf_text_extraction.txt",'a',encoding = 'utf-8') as text_file:
+        #text_file.write(text_all)
+
+Jsonlist = []
+counter = 0
+for i in range(pdf_num):
+    counter += 1
+    single_json_string = {}
+    single_json_string["number"] = counter
+    single_json_string["title"] = pdf_file_name_list[i]
+    single_json_string["text"] = all_doc[i]
+
+    #print(type(single_json_string))
+    Jsonlist.append(single_json_string)
+    print(f"The content of {pdf_file_name_list[i]} has been loaded")
+
+
+#Go through all html documents
+html_num = 0
+html_file_list = []
+html_file_name_list = []
+html_text_doc = []
+
+for files in os.walk(file_dir):
+
+    for file in files[2]:
+        if os.path.splitext(file)[1] == '.html' or os.path.splitext(file)[1] == '.HTML':
+            html_file_list.append(file_dir + '\\' + file)
+            html_file_name_list.append(os.path.splitext(file)[0])
+            html_num += 1
+
+for html_file in html_file_list:
+
+    with open(html_file, 'r', encoding='utf-8') as file:
+        html_content = file.read()
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    text = soup.get_text()
+
+    html_text_doc.append(text)
+
+for i in range(html_num):
+    counter += 1
+    single_json_string = {}
+    single_json_string["number"] = counter
+    single_json_string["title"] = html_file_name_list[i]
+    single_json_string["text"] = html_text_doc[i]
+
+    #print(type(single_json_string))
+    Jsonlist.append(single_json_string)
+
+    print(f"The content of {html_file_name_list[i]} has been loaded")
+
+#Go through all epub documents
+epub_num = 0
+epub_file_list = []
+epub_file_name_list = []
+epub_text_doc = []
+epub_all_text = []
+
+class GetContent(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.content = ""
+
+    def handle_data(self, data):
+        self.content += data
+
+re_digits = re.compile(r'(\d+)')
+def embedded_numbers(s):
+    pieces = re_digits.split(s)
+    pieces[1::2] = map(int, pieces[1::2])
+    return pieces
+
+def sort_with_embedded_numbers(zipinfo_list):
+    aux = [(embedded_numbers(zipinfo.filename), zipinfo)\
+           for zipinfo in zipinfo_list]
+    aux.sort()
+    return [zipinfo for _, zipinfo in aux]
+
+
+for files in os.walk(file_dir):
+
+    for file in files[2]:
+        if os.path.splitext(file)[1] == '.epub' or os.path.splitext(file)[1] == '.EPUB':
+            epub_file_list.append(file_dir + '\\' + file)
+            epub_file_name_list.append(os.path.splitext(file)[0])
+            epub_num += 1
+
+for epub_file in epub_file_list:
+
+    #book = epub.read_epub(epub_file)
+
+    #for item in book.get_items():
+       # content = item.get_content()
+       # soup = BeautifulSoup(content, 'html.parser')
+       # text = soup.get_text()
+        #print(content)
+       # epub_all_text.append(text)
+
+    #epub_text_doc.append(epub_all_text)
+    #result = epub2txt(epub_file)
+    #epub_content_in_one_book = '\n'.join(result)
+
+    #epub_text_doc.append(epub_content_in_one_book)
+
+    fh = zipfile.ZipFile(epub_file)
+    html_list = [zip_info for zip_info in fh.filelist
+                    if zip_info.filename.endswith("html") or zip_info.filename.endswith("htm")]
+
+    html_list = sort_with_embedded_numbers(html_list)
+    content_obj = GetContent()
+    for html in html_list:
+        content_obj.feed(str(fh.read(html)))
+
+    epub_content_in_one_book = content_obj.content
+    epub_text_doc.append(epub_content_in_one_book)
+
+
+for i in range(epub_num):
+    counter += 1
+    single_json_string = {}
+    single_json_string["number"] = counter
+    single_json_string["title"] = epub_file_name_list[i]
+    single_json_string["text"] = epub_text_doc[i]
+
+    #print(type(single_json_string))
+    Jsonlist.append(single_json_string)
+
+    print(f"The content of {epub_file_name_list[i]} has been loaded")
+
+
+json_str = json.dumps(Jsonlist)
+
+with open('D:\hntu deep learning program\\NLPgeneration\searched-pdf/Larger_database_textbook.json', 'w') as f:
+    f.write(json_str)
