@@ -1,0 +1,57 @@
+import os
+import csv
+import requests
+from bs4 import BeautifulSoup
+import json
+
+file_dir = r'D:\hntu deep learning program\NLPgeneration\archive\Medium_Clean.csv'
+
+# Open the doc and read the content
+file = open(file_dir, 'r', encoding='utf-8')
+article_info = csv.reader(file)
+headers = next(article_info)
+title = headers.index('Title')
+url = headers.index('url')
+
+
+Jsonlist = []
+counter = 0
+
+for article in article_info:
+    title_get = article[title]
+    url_article = article[url]
+    key_url_label = 'https://medium.com'
+    if key_url_label in url_article:
+
+        response = requests.get(url_article)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            text_article = soup.get_text()
+            # Use 'split' method to get a list of words in the article
+            words = text_article.split()
+            # Count the number of the words in the article
+            word_count = len(words)
+            if word_count > 16000:
+                counter += 1
+                single_json_string = {}
+                single_json_string["number"] = counter
+                single_json_string["title"] = title_get
+                single_json_string["text"] = text_article
+
+                # print(type(single_json_string))
+                Jsonlist.append(single_json_string)
+                print(f"The content of {title_get} has been loaded")
+                print(f"The length of the article is {word_count} words")
+                print(counter)
+            if counter > 200:
+                break
+        else:
+            print(f"Failed to retrieve the webpage: {response.status_code}")
+
+json_str = json.dumps(Jsonlist)
+
+with open('D:\hntu deep learning program\\NLPgeneration\Data_from_M.json', 'w') as f:
+    f.write(json_str)
+
+# Show the total number of words in the article
+#print(f"The total number of words in this article: {word_count}")
