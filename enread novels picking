@@ -1,0 +1,355 @@
+import requests
+from bs4 import BeautifulSoup
+import json
+import re
+import cn2an
+
+from ast import literal_eval
+
+root_url = "https://www.enread.com"
+
+def str2num(str):
+    if str[0] == "0":
+        str_res = str[1:]
+        result = int(str_res)
+    else:
+        result = int(str)
+    return result
+
+
+
+def sort_small_list(input_list):
+    tag_list = [page_link[1] for page_link in input_list]
+    sorted_list = []
+    #len_list_tag = [len(tag) for tag in tag_list]
+    have_none_number_list = []
+
+    for tag in tag_list:
+        tag_have_number_code = []
+        for item in tag:
+            item_num_jud = re.findall(r'\d+', item)
+            if len(item_num_jud) > 0:
+                if "AROUND THE WORLD IN 80 DAYS" in tag:
+                    jud_word_num = "0"
+                    tag_have_number_code.append(jud_word_num)
+                else:
+                    jud_word_num = "1"
+                    tag_have_number_code.append(jud_word_num)
+            else:
+                jud_word_num = "0"
+                tag_have_number_code.append(jud_word_num)
+        if "1" in tag_have_number_code:
+            element_judnum = "Yes"
+            have_none_number_list.append(element_judnum)
+        else:
+            element_judnum = "No"
+            have_none_number_list.append(element_judnum)
+
+    if "No" in have_none_number_list:
+        input_list.reverse()
+        sorted_list = input_list
+        print(sorted_list)
+    else:
+        if int(tag_list[0][-1]) > 1:
+            input_list.sort(key=lambda x: str2num(x[1][-1]))
+            sorted_list = input_list
+            print(sorted_list)
+        else:
+            input_list.sort(key=lambda x: str2num(x[1][-1]))
+            sorted_list = input_list
+            print(sorted_list)
+
+
+
+    return sorted_list
+
+def removed_chinese(s):
+    return re.sub(r'[\u4e00-\u9fff]', '', s)
+
+def split_string_by_multiple_symbols(string, separators):
+    pattern = '|'.join(map(re.escape, separators))
+
+    return re.split(pattern, string)
+
+def split_by_substring(string, sub_str):
+    return re.split(fr'(?<!\w){re.escape(sub_str)}(?!\w)', string)
+
+def takekey_sort(elem):
+    return elem[1][-1]
+
+def get_links_one_page(url, headers_for_requests):
+    r = requests.get(url, headers=headers_for_requests)
+    r.encoding = "utf-8"
+    soup = BeautifulSoup(r.content, "html.parser")
+    higher_div = soup.find("div", class_='index')
+    lower_div = higher_div.find_all("a", class_='title')
+    one_page_links = []
+
+    for e in lower_div:
+        text_tag = []
+        link = e['href']
+        tag = e.get_text()
+        testbrn_seperator = re.compile('\('+r'[零|一|二|三|四|五|六|七|八|九|十|\d]+' + '\)')
+        test_brn = re.findall(testbrn_seperator, tag)
+        chnbrn_seperator = re.compile('（'+r'[零|一|二|三|四|五|六|七|八|九|十|\d]+' + '）')
+        test_chnbrn = re.findall(chnbrn_seperator,tag)
+        pure_chn_seperator = re.compile(r'[零|一|二|三|四|五|六|七|八|九|十]+')
+        test_pure_chnbrn = re.findall(pure_chn_seperator, tag)
+        splited_tag = re.split(r'(\d+)', tag)
+        test_dizhang = re.findall(r'第.*章', tag)
+        if "基督山伯爵" in tag:
+            text_tag.append("The Count of Monte Cristo")
+
+
+        elif "八十天环游地球" in tag:
+            text_tag.append("AROUND THE WORLD IN 80 DAYS")
+        elif "呼啸山庄" in tag:
+            text_tag.append("Wuthering Heights")
+        elif "哈克贝里.芬历险记" in tag:
+            text_tag.append("The Adventures of Huckleberry Finn")
+        elif "哈克贝里·芬历险记" in tag:
+            text_tag.append("The Adventures of Huckleberry Finn")
+        elif "宝岛" in tag:
+            text_tag.append("Treasure Island")
+        elif "嘉莉妹妹" in tag:
+            text_tag.append("Carrie Sisters")
+
+        elif len(test_dizhang) > 0:
+            if "嘉莉妹妹" in tag :
+                text_tag.append("嘉莉妹妹")
+            elif "爱丽丝漫游奇境记" in tag:
+                text_tag.append("爱丽丝漫游奇境记")
+
+            else:
+                dizhang_splited_tag = re.split(r'第.*章', tag)
+                find_pre_br = re.findall(r'\(.*\)', dizhang_splited_tag[0])
+                find_pre_chnbr = re.findall(r'（.*）', dizhang_splited_tag[0])
+                if len(find_pre_br) > 0:
+                    no_br_pre_tag = re.split(r'\(.*\)', dizhang_splited_tag[0])
+                    text_tag.append(no_br_pre_tag[0])
+                elif len(find_pre_chnbr) > 0:
+                    no_br_pre_tag = re.split(r'（.*）', dizhang_splited_tag[0])
+                    text_tag.append(no_br_pre_tag[0])
+                else:
+                    text_tag.append(dizhang_splited_tag[0])
+                number_for_rank_1 = ''.join(test_dizhang)
+                # print(number_for_rank_1)
+                number_for_rank_or = re.split(r'[第|章]', number_for_rank_1)
+                # print(number_for_rank_or)
+                if '\u4e00' <= number_for_rank_or[1:-1][0] <= '\u9fa5':
+                    if '○' in number_for_rank_or:
+                        number = 0
+                    else:
+                        try:
+                            number = cn2an.cn2an(number_for_rank_or[1:-1][0], 'normal')
+                        except:
+                            number = 0
+                else:
+                    if '○' in number_for_rank_or:
+                        number = 0
+                    else:
+                        number = number_for_rank_or[1:-1][0]
+                # print(number)
+                text_tag.append(str(number))
+
+        elif len(test_chnbrn) > 0:
+            brn_splited_tag = re.split(chnbrn_seperator ,tag)
+            #print("brn_splited_tag is:", brn_splited_tag)
+            #find_pre_br = re.findall(r'\(.*\)', brn_splited_tag[0])
+            #find_pre_chnbr = re.findall(r'（.*）', brn_splited_tag[0])
+            #if len(find_pre_br) > 0:
+               # no_br_pre_tag = re.split(r'\(.*\)', brn_splited_tag[0])
+                #text_tag.append(no_br_pre_tag[0])
+            #elif len(find_pre_chnbr) > 0:
+               # no_br_pre_tag = re.split(r'（.*）', brn_splited_tag[0])
+                #text_tag.append(no_br_pre_tag[0])
+            #else:
+            text_tag.append(brn_splited_tag[0])
+            number = 0
+            number_for_rank_1 = ''.join(test_chnbrn)
+            # print(number_for_rank_1)
+            number_for_rank_or = re.split(r'[（|）]', number_for_rank_1)
+            #print(number_for_rank_or)
+            if '\u4e00' <= number_for_rank_or[1:-1][0] <= '\u9fa5':
+                number = cn2an.cn2an(number_for_rank_or[1:-1][0], 'normal')
+            else:
+                number = number_for_rank_or[1:-1][0]
+            # print(number)
+            text_tag.append(str(number))
+
+
+        elif len(test_brn) > 0:
+            brn_splited_tag = re.split(testbrn_seperator ,tag)
+            #print("brn_splited_tag is:", brn_splited_tag)
+            #find_pre_br = re.findall(r'\(.*\)', brn_splited_tag[0])
+            #find_pre_chnbr = re.findall(r'（.*）', brn_splited_tag[0])
+            #if len(find_pre_br) > 0:
+                #no_br_pre_tag = re.split(r'\(.*\)', brn_splited_tag[0])
+                #text_tag.append(no_br_pre_tag[0])
+            #elif len(find_pre_chnbr) > 0:
+                #no_br_pre_tag = re.split(r'（.*）', brn_splited_tag[0])
+                #text_tag.append(no_br_pre_tag[0])
+            #else:
+            text_tag.append(brn_splited_tag[0])
+            number = 0
+            number_for_rank_1 = ''.join(test_brn)
+            # print(number_for_rank_1)
+            number_for_rank_or = re.split(r'[(|)]', number_for_rank_1)
+            # print(number_for_rank_or)
+            if '\u4e00' <= number_for_rank_or[1:-1][0] <= '\u9fa5':
+                number = cn2an.cn2an(number_for_rank_or[1:-1][0], 'normal')
+            else:
+                number = number_for_rank_or[1:-1][0]
+            # print(number)
+
+
+            text_tag.append(str(number))
+            #print(splited_text)
+
+        #elif len(test_pure_chnbrn) > 0:
+            #pure_chnbrn_split_tag = re.split(pure_chn_seperator ,tag)
+            #find_pre_br = re.findall(r'\(.*\)', pure_chnbrn_split_tag[0])
+            #if len(find_pre_br) > 0:
+               # no_br_pre_tag = re.split(r'\(.*\)', pure_chnbrn_split_tag[0])
+               # text_tag.append(no_br_pre_tag[0])
+           # else:
+               # text_tag.append(pure_chnbrn_split_tag[0])
+
+            #number = cn2an.cn2an(test_pure_chnbrn[0], 'normal')
+
+            #text_tag.append(number)
+
+        elif len(splited_tag) == 1:
+            if "福尔摩斯" in splited_tag[0]:
+                text_tag = [splited_tag[0]]
+            elif "Jane Eyre" in tag:
+                text_tag.append("Jane Eyre")
+            else:
+                if "嘉莉妹妹" in tag:
+                    text_tag.append("嘉莉妹妹")
+                else:
+                    text_tag = re.split(r'-', tag)
+        else:
+            if "诺桑觉寺" in tag:
+                text_tag.append("NORTHANGER ABBEY CHAPTER")
+            elif "爱丽丝漫游奇境记" in tag:
+                text_tag.append("爱丽丝漫游奇境记")
+
+            elif '-' in splited_tag[0]:
+                if "福尔摩斯" in splited_tag[0]:
+                    if "Chapter" in splited_tag[0]:
+                        regex_delimiter = r'Chapter'
+                        text_tag = re.split(regex_delimiter, splited_tag[0])
+
+                else:
+                    if "Chapter" in splited_tag[0]:
+                        regex_delimiter = r'Chapter'
+                        text_tag = re.split(regex_delimiter, splited_tag[0])
+                        text_tag = [text_tag[0]]
+                    else:
+                        text_tag = splited_tag[0].split('-')
+                        text_tag = [text_tag[0]]
+            elif len(splited_tag[0].split()) > 1:
+                if "Chapter" in splited_tag[0]:
+                    regex_delimiter = r'Chapter'
+                    text_tag = re.split(regex_delimiter, splited_tag[0])
+                    text_tag = [text_tag[0]]
+                else:
+                    text_tag = [splited_tag[0]]
+                    text_tag = [text_tag[0]]
+            elif len(splited_tag[0].split()) == 1:
+                text_tag = splited_tag[0].split()
+                text_tag = [text_tag[0]]
+
+            #if text_tag == None:
+                #text_tag = splited_tag[0]
+            number_for_rank = re.findall(r'\d+', tag)
+            if len(number_for_rank) > 1:
+                number_for_rank = number_for_rank[-1]
+            elif len(number_for_rank) == 1:
+                number_for_rank = number_for_rank[0]
+            elif len(number_for_rank) == 0:
+                number_for_rank = []
+            text_tag.append(number_for_rank)
+        splited_tag = text_tag
+        print(splited_tag)
+        one_page_links.append((link, splited_tag))
+
+    return one_page_links
+
+all_pages_links = []
+new_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0'
+    }
+
+
+for index in range(152):
+    index_real = index + 1
+    main_url = f"https://www.enread.com/novel/list_{index_real}.html"
+    one_page_links = get_links_one_page(main_url, new_headers)
+    all_pages_links = all_pages_links + one_page_links
+
+same_novel_list = []
+old_main_tag = []
+new_list = []
+counter = 0
+Jsonlist = []
+start_pin = 1
+all_links_list_dict = {}
+for page_link in all_pages_links:
+    link, splited_tag = page_link
+
+    main_tag = splited_tag[0]
+
+    if main_tag not in old_main_tag:
+        old_main_tag.append(main_tag)
+        all_links_list_dict[main_tag] = []
+        all_links_list_dict[main_tag].append(page_link)
+
+
+    else:
+        for tag_key in all_links_list_dict:
+            if main_tag == tag_key:
+                all_links_list_dict[main_tag].append(page_link)
+
+for key in all_links_list_dict:
+    new_list.append(all_links_list_dict[key])
+
+
+
+for novel_doc_list in new_list:
+    #print(novel_doc_list)
+    counter += 1
+    novel_doc_list_1 = sort_small_list(novel_doc_list)
+    single_json_string = {}
+    pointkey = 1
+    main_tag = str()
+    for page_link in novel_doc_list_1:
+        link, splited_tag = page_link
+        used_url = root_url + link
+        main_tag = splited_tag[0]
+        r = requests.get(used_url, headers=new_headers)
+        r.encoding = "utf-8"
+        soup = BeautifulSoup(r.content, "html.parser")
+        td = soup.find("td", id='content')
+        content = td.find("div", id='dede_content')
+        for sup in content.find_all("sup", class_="circle"):
+            sup.clear()
+        content_new = content.get_text()
+        no_chinese_text = removed_chinese(content_new)
+
+        if pointkey == 1:
+            single_json_string["idx"] = counter
+            single_json_string["title"] = main_tag
+            single_json_string["content"] = no_chinese_text
+            pointkey = 0
+        else:
+            origin = single_json_string["content"]
+            single_json_string["content"] = origin + no_chinese_text
+    print(f"The content of {main_tag} has been loaded")
+    Jsonlist.append(single_json_string)
+
+json_str = json.dumps(Jsonlist)
+save_path = r"D:\hntu deep learning program\\NLPgeneration\Novels_from_enread.json"
+with open(save_path, 'w') as f:
+    f.write(json_str)
