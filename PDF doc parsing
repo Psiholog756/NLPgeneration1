@@ -1,0 +1,63 @@
+import pdfplumber
+import os
+import json
+from bs4 import BeautifulSoup
+from ebooklib import epub
+import ebooklib
+from epub2txt import epub2txt
+import sys,re,zipfile,os
+from html.parser import HTMLParser
+
+file_dir = r'D:\hntu deep learning program\NLPgeneration\research_article'
+pdf_file_list = []
+pdf_file_name_list = []
+pdf_num = 0
+#Go through all the pdf documents
+for files in os.walk(file_dir):
+
+    for file in files[2]:
+        if os.path.splitext(file)[1] == '.pdf' or os.path.splitext(file)[1] == '.PDF':
+            pdf_file_list.append(file_dir + '\\' + file)
+            pdf_file_name_list.append(os.path.splitext(file)[0])
+            pdf_num += 1
+
+#print(pdf_file_list)
+all_doc = []
+num_seq = 0
+for pdf_file_path in pdf_file_list:
+
+    pdf = pdfplumber.open(pdf_file_path)
+    pages = pdf.pages
+    #print(pages)
+
+    text_all = []
+    for page in pages:
+        text = page.extract_text()
+        text_all.append(text)
+    text_all = '\n'.join(text_all)
+    pdf.close()
+    all_doc.append(text_all)
+    #print(text_all)
+    print(f"The content of {pdf_file_name_list[num_seq]} has been loaded")
+    #with open("pdf_text_extraction.txt",'a',encoding = 'utf-8') as text_file:
+        #text_file.write(text_all)
+    num_seq += 1
+
+Jsonlist = []
+counter = 0
+for i in range(pdf_num):
+    counter += 1
+    single_json_string = {}
+
+    single_json_string["number"] = counter
+    single_json_string["title"] = pdf_file_name_list[i]
+    single_json_string["text"] = all_doc[i]
+
+    #print(type(single_json_string))
+    Jsonlist.append(single_json_string)
+    print(f"The content of {pdf_file_name_list[i]} has been put in json doc")
+
+json_str = json.dumps(Jsonlist)
+
+with open('D:\hntu deep learning program\\NLPgeneration\\research_article/research_article_package.json', 'w') as f:
+    f.write(json_str)
